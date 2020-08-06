@@ -41,7 +41,7 @@ class MWSClient{
         'A1VC38T7YXB528' => 'mws.amazonservices.jp',
         'AAHKV2X7AFYLW' => 'mws.amazonservices.com.cn',
         'A39IBJ37TRP1C6' => 'mws.amazonservices.com.au',
-	'A2Q3Y263D00KWC' => 'mws.amazonservices.com'
+    'A2Q3Y263D00KWC' => 'mws.amazonservices.com'
     ];
 
     protected $debugNextFeed = false;
@@ -93,7 +93,8 @@ class MWSClient{
         try{
             $this->ListOrderItems('validate');
         } catch(Exception $e) {
-            if ($e->getMessage() == 'Invalid AmazonOrderId: validate') {
+            
+            if ($e->getMessage() == 'Invalid AmazonOrderId: validate' || $e->getMessage() == 'The order id you have requested is not valid.'|| $e->getMessage() == 'The input you have submitted is not valid. Please check your input and try again.') {
                 return true;
             } else {
                 return false;
@@ -652,11 +653,11 @@ class MWSClient{
                         }
                         if (isset($product['Relationships']['VariationParent']['Identifiers']['MarketplaceASIN']['ASIN'])) {
                             $array['Parentage'] = 'child';
-			    $array['Relationships'] = $product['Relationships']['VariationParent']['Identifiers']['MarketplaceASIN']['ASIN'];
+                $array['Relationships'] = $product['Relationships']['VariationParent']['Identifiers']['MarketplaceASIN']['ASIN'];
                         }
-			if (isset($product['Relationships']['VariationChild'])) {
-		            $array['Parentage'] = 'parent';
-	                }
+            if (isset($product['Relationships']['VariationChild'])) {
+                    $array['Parentage'] = 'parent';
+                    }
                         if (isset($product['SalesRankings']['SalesRank'])) {
                             $array['SalesRank'] = $product['SalesRankings']['SalesRank'];
                         }
@@ -783,32 +784,32 @@ class MWSClient{
         }
     }
 
-	/**
-	 * Delete product's based on SKU
-	 * @param string $array array containing sku's
-	 * @return array feed submission result
-	 */
-	public function deleteProductBySKU(array $array) {
+    /**
+     * Delete product's based on SKU
+     * @param string $array array containing sku's
+     * @return array feed submission result
+     */
+    public function deleteProductBySKU(array $array) {
 
-		$feed = [
-			'MessageType' => 'Product',
-			'Message' => []
-		];
+        $feed = [
+            'MessageType' => 'Product',
+            'Message' => []
+        ];
 
-		foreach ($array as $sku) {
-			$feed['Message'][] = [
-				'MessageID' => rand(),
-				'OperationType' => 'Delete',
-				'Product' => [
-					'SKU' => $sku
-				]
-			];
-		}
+        foreach ($array as $sku) {
+            $feed['Message'][] = [
+                'MessageID' => rand(),
+                'OperationType' => 'Delete',
+                'Product' => [
+                    'SKU' => $sku
+                ]
+            ];
+        }
 
-		return $this->SubmitFeed('_POST_PRODUCT_DATA_', $feed);
-	}
+        return $this->SubmitFeed('_POST_PRODUCT_DATA_', $feed);
+    }
 
-	/**
+    /**
      * Update a product's stock quantity
      * @param array $array array containing sku as key and quantity as value
      * @return array feed submission result
@@ -994,8 +995,8 @@ class MWSClient{
             return $feedContent;
         }
 
-	$purgeAndReplace = isset($options['PurgeAndReplace']) ? $options['PurgeAndReplace'] : false;
-	    
+    $purgeAndReplace = isset($options['PurgeAndReplace']) ? $options['PurgeAndReplace'] : false;
+        
         $query = [
             'FeedType' => $FeedType,
             'PurgeAndReplace' => ($purgeAndReplace ? 'true' : 'false'),
@@ -1134,46 +1135,158 @@ class MWSClient{
     }
     
     /**
-	 * Get a list's inventory for Amazon's fulfillment
-	 *
-	 * @param array $sku_array
-	 *
-	 * @return array
-	 * @throws Exception
-	 */
+     * Get a list's inventory for Amazon's fulfillment
+     *
+     * @param array $sku_array
+     *
+     * @return array
+     * @throws Exception
+     */
     public function ListInventorySupply($sku_array = []){
-	
-	    if (count($sku_array) > 50) {
-		    throw new Exception('Maximum amount of SKU\'s for this call is 50');
-	    }
-	
-	    $counter = 1;
-	    $query = [
-		    'MarketplaceId' => $this->config['Marketplace_Id']
-	    ];
-	
-	    foreach($sku_array as $key){
-		    $query['SellerSkus.member.' . $counter] = $key;
-		    $counter++;
-	    }
-	
-	    $response = $this->request(
-		    'ListInventorySupply',
-		    $query
-	    );
-	
-	    $result = [];
-	    if (isset($response['ListInventorySupplyResult']['InventorySupplyList']['member'])) {
-		    foreach ($response['ListInventorySupplyResult']['InventorySupplyList']['member'] as $index => $ListInventorySupplyResult) {
-			    $result[$index] = $ListInventorySupplyResult;
-		    }
-	    }
-	    
-	    return $result;
+    
+        if (count($sku_array) > 50) {
+            throw new Exception('Maximum amount of SKU\'s for this call is 50');
+        }
+    
+        $counter = 1;
+        $query = [
+            'MarketplaceId' => $this->config['Marketplace_Id']
+        ];
+    
+        foreach($sku_array as $key){
+            $query['SellerSkus.member.' . $counter] = $key;
+            $counter++;
+        }
+    
+        $response = $this->request(
+            'ListInventorySupply',
+            $query
+        );
+    
+        $result = [];
+        if (isset($response['ListInventorySupplyResult']['InventorySupplyList']['member'])) {
+            foreach ($response['ListInventorySupplyResult']['InventorySupplyList']['member'] as $index => $ListInventorySupplyResult) {
+                $result[$index] = $ListInventorySupplyResult;
+            }
+        }
+        
+        return $result;
+    }
+
+    /**
+     * Returns financial events for a given order by it's id
+     *
+     * @param string $AmazonOrderId
+     * @return array
+     *
+     * @throws Exception
+     */
+    public function ListFinancialEventsByOrderId($AmazonOrderId)
+    {
+        $query = ['AmazonOrderId' => $AmazonOrderId];
+        $response = $this->request('ListFinancialEvents', $query);
+
+        return $this->processListFinancialEventsResponse($response);
+    }
+
+    /**
+     * Returns financial events for a given financial event group id
+     *
+     * @param $groupId
+     * @return array
+     *
+     * @throws Exception
+     */
+    public function ListFinancialEventsByEventGroupId($groupId)
+    {
+        $query = ['FinancialEventGroupId' => $groupId];
+        $response = $this->request('ListFinancialEvents', $query);
+
+        return $this->processListFinancialEventsResponse($response);
+    }
+
+    /**
+     * Returns financial events for a given financial events date range
+     *
+     * @param DateTime $from
+     * @param DateTime|null $till
+     *
+     * @return array
+     *
+     * @throws Exception
+     */
+    public function ListFinancialEventsByDateRange(DateTime $from, DateTime $till = null)
+    {
+        $query = [
+            'PostedAfter' => gmdate(self::DATE_FORMAT, $from->getTimestamp())
+        ];
+
+        if (!is_null($till)) {
+            $query['PostedBefore'] = gmdate(self::DATE_FORMAT, $till->getTimestamp());
+        }
+
+        $response = $this->request('ListFinancialEvents', $query);
+
+        return $this->processListFinancialEventsResponse($response);
+    }
+
+    /**
+     * Processes list financial events response
+     *
+     * @param array $response
+     * @param string $fieldName
+     *
+     * @return array
+     */
+    protected function processListFinancialEventsResponse($response, $fieldName = 'ListFinancialEventsResult')
+    {
+        if (!isset($response[$fieldName]['FinancialEvents'])) return [];
+
+        $data = $response[$fieldName]['FinancialEvents'];
+
+        // We remove empty lists
+        $data = array_filter($data, function($item) {
+            return count($item) > 0;
+        });
+
+        if (isset($response[$fieldName]['NextToken'])) {
+            // Remove ==, I've seen cases when Amazon servers fails otherwise
+            $data['ListFinancialEvents'] = $data;
+            $data['NextToken'] = rtrim($response[$fieldName]['NextToken'], '=');
+
+            return $data;
+        }
+
+        return ['ListFinancialEvents' => $data];
+    }
+
+    /**
+     * Returns the next page of financial events using the NextToken parameter
+     *
+     * @param string $nextToken
+     * @return array
+     *
+     * @throws Exception
+     */
+    public function ListFinancialEventsByNextToken($nextToken)
+    {
+        $query = [
+            'NextToken' => $nextToken,
+        ];
+
+        $response = $this->request(
+            'ListFinancialEventsByNextToken',
+            $query
+        );
+
+        return $this->processListFinancialEventsResponse($response, 'ListFinancialEventsByNextTokenResult');
     }
 
     /**
      * Request MWS
+     *
+     * @return string|array
+     * @throws Exception
      */
     private function request($endPoint, array $query = [], $body = null, $raw = false)
     {
